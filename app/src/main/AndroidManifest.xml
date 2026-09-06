@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="false"
+        android:label="Miracle Linux"
+        android:theme="@style/Theme.MiracleLinux"
+        android:extractNativeLibs="true">
+        <!--
+          extractNativeLibs="true" is required: it forces Android to extract
+          libproot.so to a real file on disk (applicationInfo.nativeLibraryDir)
+          instead of leaving it compressed inside the APK. We need a real,
+          executable file path to actually run PRoot as a process.
+        -->
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- This is what makes Miracle Linux replace the home screen. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
