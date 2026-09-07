@@ -145,6 +145,14 @@ class MainActivity : AppCompatActivity() {
     private fun startProotBash() {
         val prootBinary = File(applicationInfo.nativeLibraryDir, "libproot.so")
 
+        // proot's two Termux-specific dependencies (libtalloc.so.2,
+        // libandroid-shmem.so) are bundled with their REAL original names
+        // directly in jniLibs — nativeLibraryDir is the one place Android
+        // still allows executing/linking native code from. (An earlier
+        // version of this copied them into filesDir to rename libtalloc.so
+        // back to libtalloc.so.2, but Android 10+ blocks executing anything
+        // from an app's own writable private storage — that's what caused
+        // the "library not found" crash.)
         val command = listOf(
             prootBinary.absolutePath,
             "-r", rootfsDir.absolutePath,
@@ -154,9 +162,11 @@ class MainActivity : AppCompatActivity() {
             "/bin/bash"
         )
 
-        val process = ProcessBuilder(command)
-            .redirectErrorStream(true)
-            .start()
+        val processBuilder = ProcessBuilder(command)
+        processBuilder.environment()["LD_LIBRARY_PATH"] = applicationInfo.nativeLibraryDir
+        processBuilder.redirectErrorStream(true)
+
+        val process = processBuilder.start()
         bashProcess = process
 
         // Reader thread: pipes bash's real output back into the UI.
@@ -166,6 +176,7 @@ class MainActivity : AppCompatActivity() {
             while (reader.readLine().also { line = it } != null) {
                 appendOutput(line + "\n")
             }
+            appendOutput("\n[process exited]\n")
         }.start()
     }
 
@@ -173,9 +184,13 @@ class MainActivity : AppCompatActivity() {
         val process = bashProcess ?: return
         appendOutput("$ $command\n")
         Thread {
-            val writer = OutputStreamWriter(process.outputStream)
-            writer.write("$command\n")
-            writer.flush()
+            try {
+                val writer = OutputStreamWriter(process.outputStream)
+                writer.write("$command\n")
+                writer.flush()
+            } catch (e: Exception) {
+                appendOutput("[error: process is not running — ${e.message}]\n")
+            }
         }.start()
     }
 
