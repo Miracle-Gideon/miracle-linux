@@ -17,22 +17,6 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.util.zip.GZIPInputStream
 
-/**
- * MiracleLinux MainActivity — v0.1 proof-of-concept only.
- *
- * Goal for this milestone (nothing more yet): prove that a real Debian/Kali
- * rootfs, fully bundled inside this app, can be extracted on first run and
- * booted into a real interactive bash session via PRoot — with zero
- * dependency on Termux being separately installed.
- *
- * KNOWN LIMITATION (intentional, for this milestone): this uses plain
- * process pipes for bash's stdin/stdout, NOT a real pseudo-terminal (pty).
- * That means: no colors, no line-editing, no job control, no ctrl+c yet.
- * Real interactive terminal behavior requires native (JNI) pty allocation —
- * this is the same problem Termux solves with its own native TerminalSession
- * code, and is the natural next step after this milestone proves the core
- * PRoot pipeline works at all.
- */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var outputView: TextView
@@ -60,17 +44,16 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
-    /** Builds a bare-bones scrollable terminal UI: output area + one input line. */
     private fun buildUi() {
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
 
         outputView = TextView(this)
-        outputView.setTextColor(0xFF23BAC2.toInt()) // Miracle Linux cyan accent
+        outputView.setTextColor(0xFF23BAC2.toInt())
         outputView.setBackgroundColor(0xFF000000.toInt())
         outputView.textSize = 12f
         outputView.typeface = android.graphics.Typeface.MONOSPACE
-        outputView.setTextIsSelectable(true) // lets you long-press to select/copy output
+        outputView.setTextIsSelectable(true)
 
         scrollView = ScrollView(this)
         scrollView.addView(outputView)
@@ -93,7 +76,6 @@ class MainActivity : AppCompatActivity() {
         setContentView(root)
     }
 
-    /** Extracts the bundled rootfs.tar.gz (assets) into app-private storage. */
     private fun extractRootfs() {
         rootfsDir.mkdirs()
         val assetStream = assets.open("rootfs.tar.gz")
@@ -115,7 +97,7 @@ class MainActivity : AppCompatActivity() {
                                     java.io.File(entry.linkName).toPath()
                                 )
                             } catch (e: Exception) {
-                                // Ignore individual symlink failures; log for later review.
+                                appendOutput("[symlink failed: ${entry.name} -> ${entry.linkName} (${e.message})]\n")
                             }
                         }
 
@@ -135,9 +117,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
         appendOutput("Rootfs extracted to: ${rootfsDir.absolutePath}\n")
+
+        val checks = listOf("bin", "usr/bin", "usr/bin/bash", "root", "bin/bash")
+        for (path in checks) {
+            val f = File(rootfsDir, path)
+            appendOutput("[check] $path -> exists=${f.exists()} isSymlink=${java.nio.file.Files.isSymbolicLink(f.toPath())}\n")
+        }
     }
 
-    /** Launches the bundled proot binary, chrooting into the rootfs and exec'ing bash. */
     private fun startProotBash() {
         val prootBinary = File(applicationInfo.nativeLibraryDir, "libproot.so")
 
@@ -152,9 +139,6 @@ class MainActivity : AppCompatActivity() {
 
         val processBuilder = ProcessBuilder(command)
         processBuilder.environment()["LD_LIBRARY_PATH"] = applicationInfo.nativeLibraryDir
-        // proot's Termux build has Termux's own tmp path hardcoded as default;
-        // that path doesn't exist in our app's sandbox, so proot's own error
-        // message tells us directly to override it via this env variable.
         val prootTmpDir = File(filesDir, "proot-tmp").apply { mkdirs() }
         processBuilder.environment()["PROOT_TMP_DIR"] = prootTmpDir.absolutePath
         processBuilder.redirectErrorStream(true)
