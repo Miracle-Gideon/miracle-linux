@@ -70,6 +70,7 @@ class MainActivity : AppCompatActivity() {
         outputView.setBackgroundColor(0xFF000000.toInt())
         outputView.textSize = 12f
         outputView.typeface = android.graphics.Typeface.MONOSPACE
+        outputView.setTextIsSelectable(true) // lets you long-press to select/copy output
 
         scrollView = ScrollView(this)
         scrollView.addView(outputView)
@@ -108,9 +109,6 @@ class MainActivity : AppCompatActivity() {
 
                         entry.isSymbolicLink -> {
                             outFile.parentFile?.mkdirs()
-                            // Best-effort symlink creation. A real rootfs has many of
-                            // these (e.g. /bin -> usr/bin); missing them silently is
-                            // safer here than crashing the whole extraction.
                             try {
                                 java.nio.file.Files.createSymbolicLink(
                                     outFile.toPath(),
@@ -126,8 +124,6 @@ class MainActivity : AppCompatActivity() {
                             FileOutputStream(outFile).use { out ->
                                 tarStream.copyTo(out)
                             }
-                            // Preserve the executable bit — critical for /bin/bash and
-                            // every other binary inside the rootfs to actually run.
                             val ownerExecuteBit = 0b001000000
                             if (entry.mode and ownerExecuteBit != 0) {
                                 outFile.setExecutable(true, false)
@@ -145,14 +141,6 @@ class MainActivity : AppCompatActivity() {
     private fun startProotBash() {
         val prootBinary = File(applicationInfo.nativeLibraryDir, "libproot.so")
 
-        // proot's two Termux-specific dependencies (libtalloc.so.2,
-        // libandroid-shmem.so) are bundled with their REAL original names
-        // directly in jniLibs — nativeLibraryDir is the one place Android
-        // still allows executing/linking native code from. (An earlier
-        // version of this copied them into filesDir to rename libtalloc.so
-        // back to libtalloc.so.2, but Android 10+ blocks executing anything
-        // from an app's own writable private storage — that's what caused
-        // the "library not found" crash.)
         val command = listOf(
             prootBinary.absolutePath,
             "-r", rootfsDir.absolutePath,
@@ -164,12 +152,16 @@ class MainActivity : AppCompatActivity() {
 
         val processBuilder = ProcessBuilder(command)
         processBuilder.environment()["LD_LIBRARY_PATH"] = applicationInfo.nativeLibraryDir
+        // proot's Termux build has Termux's own tmp path hardcoded as default;
+        // that path doesn't exist in our app's sandbox, so proot's own error
+        // message tells us directly to override it via this env variable.
+        val prootTmpDir = File(filesDir, "proot-tmp").apply { mkdirs() }
+        processBuilder.environment()["PROOT_TMP_DIR"] = prootTmpDir.absolutePath
         processBuilder.redirectErrorStream(true)
 
         val process = processBuilder.start()
         bashProcess = process
 
-        // Reader thread: pipes bash's real output back into the UI.
         Thread {
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             var line: String?
