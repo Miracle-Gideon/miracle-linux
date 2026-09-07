@@ -39,6 +39,13 @@ android {
     // (applicationInfo.nativeLibraryDir) instead of leaving it compressed inside the APK.
     // Without this flag, modern Android Gradle Plugin defaults to NOT extracting native
     // libs to disk, and our PRoot binary would have no real path to execute from.
+    // rootfs.tar.gz is already gzip-compressed — trying to compress it again
+    // during packaging wastes memory for zero size benefit (and was the
+    // actual cause of the CI build running out of heap space).
+    androidResources {
+        noCompress += "tar.gz"
+    }
+
     packaging {
         jniLibs {
             useLegacyPackaging = true

@@ -4,13 +4,12 @@
     <application
         android:allowBackup="false"
         android:label="Miracle Linux"
-        android:theme="@style/Theme.MiracleLinux"
-        android:extractNativeLibs="true">
+        android:theme="@style/Theme.MiracleLinux">
         <!--
-          extractNativeLibs="true" is required: it forces Android to extract
-          libproot.so to a real file on disk (applicationInfo.nativeLibraryDir)
-          instead of leaving it compressed inside the APK. We need a real,
-          executable file path to actually run PRoot as a process.
+          Native lib extraction (needed so libproot.so has a real executable
+          file path) is now configured via packaging.jniLibs.useLegacyPackaging
+          in build.gradle.kts, not this manifest attribute — AGP flags the
+          manifest version as deprecated when both are set.
         -->
 
         <activity
