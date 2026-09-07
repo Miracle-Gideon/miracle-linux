@@ -1,64 +1,69 @@
-# Miracle Linux — v0.1 "GhostByte" (proof of concept)
-
-Real Debian/Kali running inside PRoot, fully bundled into one Android app,
-launched with zero manual setup — no separate Termux install required.
-
-## Build strategy: everything heavy happens on GitHub Actions, not the tablet
-
-Development happens in Termux + Kali PRoot on the tablet — editing code,
-git commits, pushing. The actual Android/Gradle build (which needs a full
-Android SDK and real compute) runs on GitHub's servers, not locally.
+All development can happen from Termux + Kali PRoot directly on an Android
+device — editing code, git commits, pushing. The actual Android/Gradle
+build (which needs a full Android SDK and real compute) runs on GitHub's
+servers instead of locally, so no Android Studio, local Gradle, or local
+SDK install is ever required.
 
 Workflow:
-1. Edit code in Termux, `git push`
+1. Edit code, `git push`
 2. GitHub Actions (`.github/workflows/build.yml`) builds the APK automatically
 3. Download the finished `.apk` from the workflow run's "Artifacts" section
-4. Install it on the tablet to test
+4. Install it on a device to test
 
-No Android Studio, no local Gradle, no local SDK needed at any point.
+## Preparing the two bundled assets
 
-## What's still missing before this actually builds
-
-Two real binary assets are needed that this scaffold doesn't include yet,
-since they're specific to your device and too large to hand-write here:
+Two binary assets have to be prepared once and attached to a GitHub Release
+in this repo (they're too large for normal git history) — `build.yml` has
+a commented-out download step ready to be filled in once they're uploaded.
 
 ### 1. `app/src/main/jniLibs/arm64-v8a/libproot.so`
-This is the real `proot` binary, just renamed so Android's packaging system
-extracts it to a real executable file path instead of leaving it compressed
-inside the APK. **Don't build this from scratch** — copy the one you already
-have working in Termux:
+The real `proot` binary, renamed so Android's packaging system extracts it
+to a real executable file path instead of leaving it compressed inside the
+APK:
 
 ```
-cp $PREFIX/bin/proot /path/to/libproot.so
+cp $PREFIX/bin/proot libproot.so
 ```
 
-One thing to check before it'll work standalone: Termux's `proot` may be
-dynamically linked against libraries under `$PREFIX/lib` (e.g. `libtalloc`).
-Run `ldd $PREFIX/bin/proot` inside Termux to see what it depends on — if
-there are non-standard shared library dependencies, those need to be
-bundled alongside it too (also as fake "native libs" in the same
-`jniLibs/arm64-v8a/` folder), or `proot` needs to be a static build instead.
+`proot` typically depends on two Termux-specific shared libraries beyond
+Android's own system libs — check with `ldd $PREFIX/bin/proot`. If present,
+copy both alongside it, with `libtalloc.so.2` renamed to `libtalloc.so` for
+packaging (Android's build system only reliably packages plain `.so`
+filenames):
+
+```
+cp $PREFIX/lib/libtalloc.so.2 libtalloc.so
+cp $PREFIX/lib/libandroid-shmem.so libandroid-shmem.so
+```
+
+`MainActivity.kt` restores `libtalloc.so`'s original name (`libtalloc.so.2`)
+at runtime in a private directory and points `LD_LIBRARY_PATH` there before
+launching `proot` — this is needed because Termux's `proot` build has
+Termux's own absolute data path baked in for finding these libraries, which
+won't exist inside a different app's sandbox.
 
 ### 2. `app/src/main/assets/rootfs.tar.gz`
-**Do NOT tar up your existing Kali install for this** — that's your personal
-dev environment (955 packages per your `fastfetch` output), not a minimal
-base. Bundling that would ship a bloated APK and contradict the "minimal by
-default, users install what they want" decision. Instead, set up a
-*separate*, clean, minimal rootfs specifically for bundling:
+A minimal, purpose-built Debian rootfs — not a personal, heavily-customized
+dev environment, which would ship a bloated APK and contradict the
+"minimal by default, users install what they want" design:
 
 ```
 proot-distro install debian --override-alias miracle-base
-tar -czf rootfs.tar.gz -C ~/.termux/proot-distro/installed-rootfs/miracle-base .
+tar -czf rootfs.tar.gz -C "$(find $PREFIX/var/lib/proot-distro -type d -name miracle-base)/rootfs" .
 ```
 
-This keeps your actual dev Kali environment untouched and gives you a
-genuinely minimal (~100-150MB) base to ship — real Debian `apt`, real
-`bash`, nothing extra pre-installed. Wireshark, Metasploit, wordlists, etc.
-are the user's call, installed after the fact, at their own resource cost.
+This gives a genuinely minimal (~150MB extracted, well under GitHub's 2GB
+release-asset limit) base — real Debian `apt`, real `bash`, nothing extra
+pre-installed. Heavier tools (Wireshark, Metasploit, wordlists, etc.) are
+each user's own call, installed after the fact via real `apt`, at their own
+resource cost.
 
-Both files are too large for normal git history. Recommended: attach them
-as assets on a GitHub Release in this repo once, then uncomment and fill in
-the download step already stubbed out in `build.yml`.
+**If your terminal tooling and your project files live in separate apps**
+(for example, native Termux for binaries like `proot`, and a separate
+proot-based distro for the actual repo), bridge files between them through
+shared storage (commonly `/sdcard/Download`) rather than trying to access
+one app's private data directory from the other — they're sandboxed from
+each other by Android regardless of both being terminal environments.
 
 ## Known limitation in this milestone (by design, not a bug)
 
@@ -75,3 +80,10 @@ natural next milestone once this one is proven working end to end.
 Open the app → real `bash` prompt output appears → type `ls` → real Debian
 filesystem output comes back. That's it. Everything else (desktop UI,
 theming, bridge commands) builds on top of this once it's proven solid.
+EOF
+echo done
+
+
+
+
+
