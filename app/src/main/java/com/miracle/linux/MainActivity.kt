@@ -34,14 +34,17 @@ class MainActivity : AppCompatActivity() {
         buildUi()
         appendOutput("Miracle Linux — GhostByte (v0.1 proof of concept)\n")
         appendOutput("[diag] versionName=${packageManager.getPackageInfo(packageName, 0).versionName}\n")
-        appendOutput("[diag] rootfsDir=${rootfsDir.absolutePath} exists=${rootfsDir.exists()}\n")
+        val marker = File(filesDir, "rootfs_extraction_complete")
+        appendOutput("[diag] rootfsDir=${rootfsDir.absolutePath} markerExists=${marker.exists()}\n")
 
         Thread {
-            if (!rootfsDir.exists()) {
-                appendOutput("First run: extracting Debian rootfs...\n")
+            if (!marker.exists()) {
+                appendOutput("Extracting Debian rootfs (fresh or previously incomplete)...\n")
+                rootfsDir.deleteRecursively()
                 extractRootfs()
+                marker.writeText("done")
             } else {
-                appendOutput("[diag] Skipping extraction — rootfsDir already existed\n")
+                appendOutput("[diag] Skipping extraction — marker confirms it already completed\n")
             }
             appendOutput("Starting real bash inside PRoot...\n\n")
             startProotBash()
