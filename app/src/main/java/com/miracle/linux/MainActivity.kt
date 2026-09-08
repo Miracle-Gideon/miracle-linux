@@ -33,11 +33,15 @@ class MainActivity : AppCompatActivity() {
 
         buildUi()
         appendOutput("Miracle Linux — GhostByte (v0.1 proof of concept)\n")
+        appendOutput("[diag] versionName=${packageManager.getPackageInfo(packageName, 0).versionName}\n")
+        appendOutput("[diag] rootfsDir=${rootfsDir.absolutePath} exists=${rootfsDir.exists()}\n")
 
         Thread {
             if (!rootfsDir.exists()) {
                 appendOutput("First run: extracting Debian rootfs...\n")
                 extractRootfs()
+            } else {
+                appendOutput("[diag] Skipping extraction — rootfsDir already existed\n")
             }
             appendOutput("Starting real bash inside PRoot...\n\n")
             startProotBash()
