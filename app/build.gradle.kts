@@ -11,8 +11,8 @@ android {
         applicationId = "com.miracle.linux"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "0.1.2-GhostByte-crash-guard"
+        versionCode = 4
+        versionName = "0.1.3-GhostByte-rootfs-rename"
 
         // We only ship an arm64 proot binary right now (real tablets/phones).
         ndk {
@@ -43,7 +43,7 @@ android {
     // during packaging wastes memory for zero size benefit (and was the
     // actual cause of the CI build running out of heap space).
     androidResources {
-        noCompress += "tar.gz"
+        noCompress += "rootfsblob"
     }
 
     packaging {

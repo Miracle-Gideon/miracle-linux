@@ -96,7 +96,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun extractRootfs() {
         rootfsDir.mkdirs()
-        val assetStream = assets.open("rootfs.tar.gz")
+        val assetStream = assets.open("rootfs.rootfsblob")
 
         GZIPInputStream(assetStream).use { gzipStream ->
             TarArchiveInputStream(gzipStream).use { tarStream ->
