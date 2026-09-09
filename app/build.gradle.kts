@@ -11,8 +11,8 @@ android {
         applicationId = "com.miracle.linux"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "0.1.1-GhostByte-marker-fix"
+        versionCode = 3
+        versionName = "0.1.2-GhostByte-crash-guard"
 
         // We only ship an arm64 proot binary right now (real tablets/phones).
         ndk {

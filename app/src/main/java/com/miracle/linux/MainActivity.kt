@@ -32,23 +32,34 @@ class MainActivity : AppCompatActivity() {
         rootfsDir = File(filesDir, "rootfs")
 
         buildUi()
-        appendOutput("Miracle Linux — GhostByte (v0.1 proof of concept)\n")
-        appendOutput("[diag] versionName=${packageManager.getPackageInfo(packageName, 0).versionName}\n")
-        val marker = File(filesDir, "rootfs_extraction_complete")
-        appendOutput("[diag] rootfsDir=${rootfsDir.absolutePath} markerExists=${marker.exists()}\n")
 
-        Thread {
-            if (!marker.exists()) {
-                appendOutput("Extracting Debian rootfs (fresh or previously incomplete)...\n")
-                rootfsDir.deleteRecursively()
-                extractRootfs()
-                marker.writeText("done")
-            } else {
-                appendOutput("[diag] Skipping extraction — marker confirms it already completed\n")
-            }
-            appendOutput("Starting real bash inside PRoot...\n\n")
-            startProotBash()
-        }.start()
+        try {
+            appendOutput("Miracle Linux — GhostByte (v0.1 proof of concept)\n")
+            appendOutput("[diag] versionName=${packageManager.getPackageInfo(packageName, 0).versionName}\n")
+            val marker = File(filesDir, "rootfs_extraction_complete")
+            appendOutput("[diag] rootfsDir=${rootfsDir.absolutePath} markerExists=${marker.exists()}\n")
+
+            Thread {
+                try {
+                    if (!marker.exists()) {
+                        appendOutput("Extracting Debian rootfs (fresh or previously incomplete)...\n")
+                        rootfsDir.deleteRecursively()
+                        extractRootfs()
+                        marker.writeText("done")
+                    } else {
+                        appendOutput("[diag] Skipping extraction — marker confirms it already completed\n")
+                    }
+                    appendOutput("Starting real bash inside PRoot...\n\n")
+                    startProotBash()
+                } catch (e: Exception) {
+                    appendOutput("[FATAL in background thread] ${e.javaClass.simpleName}: ${e.message}\n")
+                    appendOutput(e.stackTraceToString() + "\n")
+                }
+            }.start()
+        } catch (e: Exception) {
+            appendOutput("[FATAL in onCreate] ${e.javaClass.simpleName}: ${e.message}\n")
+            appendOutput(e.stackTraceToString() + "\n")
+        }
     }
 
     private fun buildUi() {
