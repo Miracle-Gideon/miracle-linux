@@ -50,6 +50,17 @@ class MainActivity : AppCompatActivity() {
                         appendOutput("[diag] Skipping extraction — marker confirms it already completed\n")
                     }
                     appendOutput("Starting real bash inside PRoot...\n\n")
+
+                    try {
+                        val directTest = ProcessBuilder(File(rootfsDir, "usr/bin/bash").absolutePath, "--version")
+                            .redirectErrorStream(true)
+                            .start()
+                        val directOutput = directTest.inputStream.bufferedReader().readText()
+                        appendOutput("[direct-exec-test] SUCCESS, output: $directOutput\n")
+                    } catch (e: Exception) {
+                        appendOutput("[direct-exec-test] FAILED: ${e.javaClass.simpleName}: ${e.message}\n")
+                    }
+
                     startProotBash()
                 } catch (e: Exception) {
                     appendOutput("[FATAL in background thread] ${e.javaClass.simpleName}: ${e.message}\n")
