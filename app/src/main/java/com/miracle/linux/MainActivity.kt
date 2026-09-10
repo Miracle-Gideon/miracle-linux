@@ -136,7 +136,11 @@ class MainActivity : AppCompatActivity() {
         }
         appendOutput("Rootfs extracted to: ${rootfsDir.absolutePath}\n")
 
-        val checks = listOf("bin", "usr/bin", "usr/bin/bash", "root", "bin/bash")
+        val checks = listOf(
+            "bin", "usr/bin", "usr/bin/bash", "root", "bin/bash",
+            "lib", "lib/ld-linux-aarch64.so.1",
+            "usr/lib/aarch64-linux-gnu", "usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1"
+        )
         for (path in checks) {
             val f = File(rootfsDir, path)
             appendOutput("[check] $path -> exists=${f.exists()} isSymlink=${java.nio.file.Files.isSymbolicLink(f.toPath())}\n")
