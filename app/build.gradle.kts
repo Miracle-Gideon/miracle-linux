@@ -10,9 +10,9 @@ android {
     defaultConfig {
         applicationId = "com.miracle.linux"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 6
-        versionName = "0.1.5-GhostByte-direct-exec-test"
+        targetSdk = 28
+        versionCode = 7
+        versionName = "0.1.6-GhostByte-targetsdk28"
 
         // We only ship an arm64 proot binary right now (real tablets/phones).
         ndk {
