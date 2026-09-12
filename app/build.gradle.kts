@@ -11,8 +11,8 @@ android {
         applicationId = "com.miracle.linux"
         minSdk = 26
         targetSdk = 28
-        versionCode = 8
-        versionName = "0.1.7-GhostByte-external-storage"
+        versionCode = 9
+        versionName = "0.1.8-GhostByte-execmap"
 
         // We only ship an arm64 proot binary right now (real tablets/phones).
         ndk {

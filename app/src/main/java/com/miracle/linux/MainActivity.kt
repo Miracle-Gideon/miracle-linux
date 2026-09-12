@@ -45,17 +45,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Trying external app-specific storage instead of internal filesDir —
-        // internal storage's app_data_file SELinux context appears to still
-        // block execution even with targetSdk lowered. External app-specific
-        // storage (no special permission needed for the app's own directory
-        // here) typically carries a different, less restrictive context.
-        val externalBase = getExternalFilesDir(null)
-        rootfsDir = if (externalBase != null) {
-            File(externalBase, "rootfs")
-        } else {
-            File(filesDir, "rootfs") // fallback if external storage is unavailable
-        }
+        // Reverted to internal storage: confirmed by direct testing that
+        // external storage doesn't help with execution (same restriction
+        // applies regardless of location) AND breaks symlinks entirely
+        // (external storage doesn't support them). Internal storage stays,
+        // and the real fix is the exec-map symlink-to-nativeLibraryDir
+        // approach below.
+        rootfsDir = File(filesDir, "rootfs")
 
         buildUi()
 
@@ -136,9 +132,27 @@ class MainActivity : AppCompatActivity() {
         setContentView(root)
     }
 
+    /** Loads the path -> nativeLibraryDir-filename map for flattened executables/libraries. */
+    private fun loadExecMap(): Map<String, String> {
+        val map = mutableMapOf<String, String>()
+        try {
+            assets.open("rootfs_exec_map.tsv").bufferedReader().useLines { lines ->
+                for (line in lines) {
+                    val parts = line.split("\t")
+                    if (parts.size == 2) map[parts[0]] = parts[1]
+                }
+            }
+        } catch (e: Exception) {
+            appendOutput("[exec-map load failed: ${e.message}]\n")
+        }
+        return map
+    }
+
     /** Extracts the bundled rootfs.tar.gz (assets) into app-private storage. */
     private fun extractRootfs() {
         rootfsDir.mkdirs()
+        val execMap = loadExecMap()
+        appendOutput("[diag] loaded exec map with ${execMap.size} entries\n")
         val assetStream = assets.open("rootfs.rootfsblob")
 
         GZIPInputStream(assetStream).use { gzipStream ->
@@ -146,6 +160,8 @@ class MainActivity : AppCompatActivity() {
                 var entry: TarArchiveEntry? = tarStream.nextTarEntry
                 while (entry != null) {
                     val outFile = File(rootfsDir, entry.name)
+                    val normalizedPath = entry.name.removePrefix("./")
+                    val flattenedName = execMap[normalizedPath]
 
                     when {
                         entry.isDirectory -> outFile.mkdirs()
@@ -162,6 +178,21 @@ class MainActivity : AppCompatActivity() {
                                 )
                             } catch (e: Exception) {
                                 appendOutput("[symlink failed: ${entry.name} -> ${entry.linkName} (${e.message})]\n")
+                            }
+                        }
+
+                        flattenedName != null -> {
+                            // This file needs to be executable — Android blocks that for
+                            // anything WE write at runtime, no matter the storage location
+                            // (confirmed by direct testing). So instead of writing the real
+                            // bytes here, symlink to the pre-bundled copy in nativeLibraryDir,
+                            // which Android DOES trust since the system placed it there.
+                            outFile.parentFile?.mkdirs()
+                            val target = File(applicationInfo.nativeLibraryDir, flattenedName)
+                            try {
+                                java.nio.file.Files.createSymbolicLink(outFile.toPath(), target.toPath())
+                            } catch (e: Exception) {
+                                appendOutput("[exec-symlink failed: ${entry.name} -> $flattenedName (${e.message})]\n")
                             }
                         }
 
