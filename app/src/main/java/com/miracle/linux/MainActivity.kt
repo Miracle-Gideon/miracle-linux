@@ -245,6 +245,13 @@ class MainActivity : AppCompatActivity() {
             "-r", rootfsDir.absolutePath,
             "-b", "/dev",
             "-b", "/proc",
+            // Explicitly bind nativeLibraryDir into proot's view — our 793
+            // flattened executables/libraries are symlinked there, and that
+            // absolute path sits OUTSIDE the rootfs boundary proot was told
+            // to treat as root. Without this bind, proot may not correctly
+            // resolve those symlink targets even though Android itself
+            // trusts and allows executing files at that real location.
+            "-b", applicationInfo.nativeLibraryDir,
             "-w", "/root",
             "/bin/bash"
         )
