@@ -61,15 +61,26 @@ class MainActivity : AppCompatActivity() {
             val marker = File(filesDir, "rootfs_extraction_complete")
             appendOutput("[diag] rootfsDir=${rootfsDir.absolutePath} markerExists=${marker.exists()}\n")
 
+            // The marker must also record WHICH install it was built for.
+            // Our exec-map symlinks point into nativeLibraryDir, which gets
+            // a brand-new random path on every fresh install — a marker
+            // that only says "done" would wrongly skip re-extraction after
+            // an update, leaving symlinks pointing at a now-gone path from
+            // the previous install. That's exactly what just happened.
+            val currentNativeLibDir = applicationInfo.nativeLibraryDir
+            val markerContent = if (marker.exists()) marker.readText() else ""
+            val markerIsStale = markerContent != currentNativeLibDir
+            appendOutput("[diag] markerStale=$markerIsStale (nativeLibraryDir changed since last extraction)\n")
+
             Thread {
                 try {
-                    if (!marker.exists()) {
-                        appendOutput("Extracting Debian rootfs (fresh or previously incomplete)...\n")
-                        rootfsDir.deleteRecursively() // clear any partial leftovers first
+                    if (!marker.exists() || markerIsStale) {
+                        appendOutput("Extracting Debian rootfs (fresh, incomplete, or stale from a prior install)...\n")
+                        rootfsDir.deleteRecursively() // clear any partial/stale leftovers first
                         extractRootfs()
-                        marker.writeText("done")
+                        marker.writeText(currentNativeLibDir)
                     } else {
-                        appendOutput("[diag] Skipping extraction — marker confirms it already completed\n")
+                        appendOutput("[diag] Skipping extraction — marker confirms it already completed for this install\n")
                     }
                     appendOutput("Starting real bash inside PRoot...\n\n")
 
@@ -78,9 +89,10 @@ class MainActivity : AppCompatActivity() {
                     // it confirms Android's exec-from-writable-storage restriction is
                     // the real blocker, not proot, symlinks, or the ELF interpreter.
                     try {
-                        val directTest = ProcessBuilder(File(rootfsDir, "usr/bin/bash").absolutePath, "--version")
-                            .redirectErrorStream(true)
-                            .start()
+                        val directTestBuilder = ProcessBuilder(File(rootfsDir, "usr/bin/bash").absolutePath, "--version")
+                        directTestBuilder.environment()["LD_PRELOAD"] = File(applicationInfo.nativeLibraryDir, "libtermux-exec-ld-preload.so").absolutePath
+                        directTestBuilder.redirectErrorStream(true)
+                        val directTest = directTestBuilder.start()
                         val directOutput = directTest.inputStream.bufferedReader().readText()
                         appendOutput("[direct-exec-test] SUCCESS, output: $directOutput\n")
                     } catch (e: Exception) {
@@ -258,6 +270,7 @@ class MainActivity : AppCompatActivity() {
 
         val processBuilder = ProcessBuilder(command)
         processBuilder.environment()["LD_LIBRARY_PATH"] = applicationInfo.nativeLibraryDir
+        processBuilder.environment()["LD_PRELOAD"] = File(applicationInfo.nativeLibraryDir, "libtermux-exec-ld-preload.so").absolutePath
         // proot's Termux build has Termux's own tmp path hardcoded as default;
         // that path doesn't exist in our app's sandbox, so proot's own error
         // message tells us directly to override it via this env variable.
