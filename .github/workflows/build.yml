@@ -24,26 +24,12 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-
-      # ---------------------------------------------------------------
-      # TODO: place the real proot binary + rootfs archive before building.
-      #
-      # These files are too large to comfortably live in normal git history,
-      # so the recommended approach is to attach them once as assets on a
-      # GitHub Release in this repo, then have this step download them here
-      # at build time — rather than committing ~150MB+ binaries directly.
-      #
-      # Source for these on day one: your OWN already-working Termux +
-      # Kali PRoot setup on the tablet — copy $PREFIX/bin/proot and tar up
-      # your installed Kali proot-distro rootfs, since that's a proot
-      # binary + rootfs pair you already know works, rather than trying to
-      # freshly cross-compile proot for arm64 on this x86_64 CI runner.
-      #
-      # - name: Fetch bundled rootfs + proot binary
-      #   run: |
-      #     curl -L -o app/src/main/assets/rootfs.tar.gz <release-asset-url>
-      #     curl -L -o app/src/main/jniLibs/arm64-v8a/libproot.so <release-asset-url>
-      # ---------------------------------------------------------------
+        with:
+          # Google recently removed the legacy "tools" package from the SDK
+          # repository — this action's default (packages: "tools platform-tools")
+          # now fails immediately trying to fetch it. Skip that default entirely;
+          # we don't need the old "tools" package for a Gradle build anyway.
+          packages: ""
 
       - name: Build debug APK
         uses: gradle/actions/setup-gradle@v3
