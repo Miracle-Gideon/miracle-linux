@@ -227,6 +227,28 @@ class MainActivity : AppCompatActivity() {
         }
         appendOutput("Rootfs extracted to: ${rootfsDir.absolutePath}\n")
 
+        // Second, independent pass: create every exec-map symlink directly from
+        // the lookup table, regardless of whether the tar still contains that
+        // path's entry. Necessary because stripping flattened files out of the
+        // tar (to shrink the APK) also strips their tar ENTRY — and the loop
+        // above only created a symlink when it encountered that entry. Without
+        // this pass, stripped files end up completely absent: no bytes, no
+        // symlink, nothing at that path at all.
+        var symlinksCreated = 0
+        for ((relativePath, flattenedName) in execMap) {
+            val outFile = File(rootfsDir, relativePath)
+            if (outFile.exists() || java.nio.file.Files.isSymbolicLink(outFile.toPath())) continue
+            outFile.parentFile?.mkdirs()
+            val target = File(applicationInfo.nativeLibraryDir, flattenedName)
+            try {
+                java.nio.file.Files.createSymbolicLink(outFile.toPath(), target.toPath())
+                symlinksCreated++
+            } catch (e: Exception) {
+                appendOutput("[exec-map pass symlink failed: $relativePath -> $flattenedName (${e.message})]\n")
+            }
+        }
+        appendOutput("[diag] exec-map pass created $symlinksCreated additional symlinks\n")
+
         // Diagnostic: check the exact paths proot complained about, so we know
         // for certain whether extraction produced them or not, instead of guessing.
         val checks = listOf(
