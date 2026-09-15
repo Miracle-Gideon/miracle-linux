@@ -11,8 +11,8 @@ android {
         applicationId = "com.miracle.linux"
         minSdk = 26
         targetSdk = 28
-        versionCode = 13
-        versionName = "0.1.12-GhostByte-execmap-pass2"
+        versionCode = 14
+        versionName = "0.1.13-GhostByte-no-termux-exec"
 
         // We only ship an arm64 proot binary right now (real tablets/phones).
         ndk {

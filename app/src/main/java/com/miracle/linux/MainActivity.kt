@@ -90,7 +90,11 @@ class MainActivity : AppCompatActivity() {
                     // the real blocker, not proot, symlinks, or the ELF interpreter.
                     try {
                         val directTestBuilder = ProcessBuilder(File(rootfsDir, "usr/bin/bash").absolutePath, "--version")
-                        directTestBuilder.environment()["LD_PRELOAD"] = File(applicationInfo.nativeLibraryDir, "libtermux-exec-ld-preload.so").absolutePath
+                        // NOT setting LD_PRELOAD to termux-exec here — confirmed via a
+                        // matching real-world bug report that termux-exec actively
+                        // rewrites executed paths to Termux's own $PREFIX, which
+                        // doesn't exist inside OUR different rootfs, breaking exec
+                        // rather than helping it.
                         directTestBuilder.redirectErrorStream(true)
                         val directTest = directTestBuilder.start()
                         val directOutput = directTest.inputStream.bufferedReader().readText()
@@ -292,7 +296,9 @@ class MainActivity : AppCompatActivity() {
 
         val processBuilder = ProcessBuilder(command)
         processBuilder.environment()["LD_LIBRARY_PATH"] = applicationInfo.nativeLibraryDir
-        processBuilder.environment()["LD_PRELOAD"] = File(applicationInfo.nativeLibraryDir, "libtermux-exec-ld-preload.so").absolutePath
+        // NOT setting LD_PRELOAD to termux-exec — confirmed it actively rewrites
+        // executed paths to Termux's own $PREFIX, which doesn't exist inside our
+        // different rootfs, breaking exec entirely rather than helping it.
         // proot's Termux build has Termux's own tmp path hardcoded as default;
         // that path doesn't exist in our app's sandbox, so proot's own error
         // message tells us directly to override it via this env variable.
